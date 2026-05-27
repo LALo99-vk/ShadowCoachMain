@@ -1,0 +1,11 @@
+{
+    "fullName" : "Harsha Vardhan",
+    "email" : "Lalo123@gmail.com",
+    "password" : "123456789",
+    "age" : 21,
+    "country" : "India",
+    "state" : "karnatake",
+    "sport" : "CRICKET",
+    "role" : "batsman",
+    "level" : "BEGINNER"
+}

@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+
+}
+
+//USer model 
+model User {
+  id String @id @default(cuid())
+
+  fullName String
+  email    String @unique
+  password String
+  age      Int
+  country  String
+  state    String
+
+  sport Sport
+  role  String
+  level ExperienceLevel
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+}
+
+
+
+model Session {
+  id                String   @id @default(cuid())
+
+  imageUrl          String
+
+  overallScore      Int
+
+  strengths         Json
+  areasToImprove    Json
+
+  priorityFix       String
+  drillSuggestion   String
+
+  confidenceLevel   ConfidenceLevel
+
+  aiRawResponse     Json?
+
+  createdAt         DateTime @default(now())
+
+  userId            String
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  chats             ChatMessage[]
+}
+
+
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+
+  role        ChatRole
+  message     String
+
+  createdAt   DateTime @default(now())
+
+  sessionId   String
+  session     Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+
+
+enum ExperienceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum Sport {
+  CRICKET
+  FOOTBALL
+  BASKETBALL
+  BADMINTON
+}
+
+enum ConfidenceLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
