@@ -9,3 +9,24 @@
     "role" : "batsman",
     "level" : "BEGINNER"
 }
+
+
+IF YOU WANT TO LOOK “ADVANCED”
+
+A MUCH better bonus feature would be:
+
+Refresh token auth
+
+OR
+
+AI conversation persistence
+
+OR
+
+Rate limiting
+
+OR
+
+role-based authorization
+
+Those impress backend reviewers more than forgot password flows in assignments.
