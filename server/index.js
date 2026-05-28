@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 const PORT = 3000;
 
 
@@ -7,6 +8,8 @@ import authRouter from "./routes/auth.js"
 import sessionRouter from "./routes/session.js";
 
 const app = express()
+
+app.use(cookieParser());
 
 
 app.use("/api/auth" , authRouter)
