@@ -1,4 +1,5 @@
 const isProduction = process.env.NODE_ENV === "production";
+const isSameOriginDeploy = Boolean(process.env.VERCEL || process.env.SAME_ORIGIN === "true");
 
 export const AUTH_COOKIE_NAME = "token";
 export const REFRESH_COOKIE_NAME = "refreshToken";
@@ -7,6 +8,15 @@ const ACCESS_MAX_AGE_MS = 15 * 60 * 1000; // 15 minutes
 const REFRESH_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function baseCookieOptions(maxAge) {
+    if (isProduction && isSameOriginDeploy) {
+        return {
+            httpOnly: true,
+            secure: true,
+            sameSite: "lax",
+            maxAge,
+        };
+    }
+
     if (isProduction) {
         return {
             httpOnly: true,

@@ -1,4 +1,6 @@
 import fs from "fs";
+import os from "os";
+import path from "path";
 import prisma from "../config/db.js";
 import analyzeStance, { sendSessionFollowUp } from "../services/ai.service.js";
 import {
@@ -12,17 +14,26 @@ function removeLocalUpload(filePath) {
     }
 }
 
+function writeUploadToTemp(file) {
+    const ext = path.extname(file.originalname) || ".jpg";
+    const localPath = path.join(os.tmpdir(), `${Date.now()}-${file.originalname || `upload${ext}`}`);
+    fs.writeFileSync(localPath, file.buffer);
+    return localPath;
+}
+
 const analyzeSession = async (req, res) => {
     const file = req.file;
-    const localPath = file?.path;
+    let localPath = null;
 
     try {
         const { question } = req.body;
         const userId = req.user.userId;
 
-        if (!file) {
+        if (!file?.buffer) {
             return res.status(400).json({ message: "Image is required" });
         }
+
+        localPath = writeUploadToTemp(file);
 
         const athlete = await prisma.user.findUnique({
             where: { id: userId },

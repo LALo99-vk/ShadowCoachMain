@@ -1,36 +1,26 @@
-import "dotenv/config";
-import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser";
-import { getCorsOptions } from "./config/cors.js";
+import app from "./app.js";
+import { getAllowedOrigins } from "./config/cors.js";
 
 const PORT = process.env.PORT || 3000;
 
-import authRouter from "./routes/auth.js";
-import sessionRouter from "./routes/session.js";
-import { generalLimiter } from "./middleware/rateLimiter.js";
+const server = app.listen(PORT);
 
-const app = express();
-
-if (process.env.NODE_ENV === "production") {
-    app.set("trust proxy", 1);
-}
-
-app.use(generalLimiter);
-
-app.use(cors(getCorsOptions()));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-
-app.use("/api/auth", authRouter);
-app.use("/api/session", sessionRouter);
-
-
-
-
-
-app.listen(PORT, () => {
+server.on("listening", () => {
     const mode = process.env.NODE_ENV || "development";
     console.log(`Server running on port ${PORT} (${mode})`);
+    console.log(`CORS allowed origins: ${getAllowedOrigins().join(", ")}`);
+    if (mode === "development") {
+        console.log("CORS dev mode: any localhost / 127.0.0.1 port is allowed");
+    }
+});
+
+server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+        console.error(`\nPort ${PORT} is already in use. Stop the other server first:`);
+        console.error(`  lsof -ti:${PORT} | xargs kill -9`);
+        console.error(`Then run: node index.js\n`);
+        process.exit(1);
+    }
+    console.error("Server failed to start:", err);
+    process.exit(1);
 });
