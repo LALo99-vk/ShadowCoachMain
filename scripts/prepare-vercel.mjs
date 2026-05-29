@@ -8,6 +8,14 @@ const nitroOut = path.join(root, "frontend/.vercel/output");
 const out = path.join(root, ".vercel/output");
 const apiFunc = path.join(out, "functions/api.func");
 
+function modulesRoot() {
+    const serverModules = path.join(root, "server/node_modules");
+    if (fs.existsSync(path.join(serverModules, "@prisma/client"))) {
+        return serverModules;
+    }
+    return path.join(root, "node_modules");
+}
+
 function copyDir(src, dest) {
     if (!fs.existsSync(src)) {
         return;
@@ -51,14 +59,14 @@ execSync(
     { cwd: root, stdio: "inherit" },
 );
 
-copyDir(path.join(root, "node_modules/.prisma"), path.join(apiFunc, "node_modules/.prisma"));
+copyDir(path.join(modulesRoot(), ".prisma"), path.join(apiFunc, "node_modules/.prisma"));
 copyDir(
-    path.join(root, "node_modules/@prisma/client"),
+    path.join(modulesRoot(), "@prisma/client"),
     path.join(apiFunc, "node_modules/@prisma/client"),
 );
-copyDir(path.join(root, "node_modules/bcrypt"), path.join(apiFunc, "node_modules/bcrypt"));
+copyDir(path.join(modulesRoot(), "bcrypt"), path.join(apiFunc, "node_modules/bcrypt"));
 copyDir(
-    path.join(root, "node_modules/node-gyp-build"),
+    path.join(modulesRoot(), "node-gyp-build"),
     path.join(apiFunc, "node_modules/node-gyp-build"),
 );
 
