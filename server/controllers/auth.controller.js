@@ -1,5 +1,5 @@
 import prisma from "../config/db.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import z from "zod";
 import {
     AUTH_COOKIE_NAME,
