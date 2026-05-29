@@ -8,12 +8,15 @@ const PORT = process.env.PORT || 3000;
 
 import authRouter from "./routes/auth.js";
 import sessionRouter from "./routes/session.js";
+import { generalLimiter } from "./middleware/rateLimiter.js";
 
 const app = express();
 
 if (process.env.NODE_ENV === "production") {
     app.set("trust proxy", 1);
 }
+
+app.use(generalLimiter);
 
 app.use(cors(getCorsOptions()));
 app.use(express.json());

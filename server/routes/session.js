@@ -9,11 +9,13 @@ import {
     deleteSession,
 } from "../controllers/ssn.contoller.js";
 
+import { sessionCreationLimiter } from "../middleware/rateLimiter.js";
+
 const sessionRouter = express.Router();
 
 sessionRouter.use(express.json());
 
-sessionRouter.post( "/analyze",authmiddleware,
+sessionRouter.post( "/analyze",authmiddleware, sessionCreationLimiter,
     upload.single("image"),
     analyzeSession
 );
