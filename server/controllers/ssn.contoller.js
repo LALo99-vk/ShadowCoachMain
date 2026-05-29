@@ -1,9 +1,22 @@
+import fs from "fs";
 import prisma from "../config/db.js";
 import analyzeStance, { sendSessionFollowUp } from "../services/ai.service.js";
+import {
+    uploadImageToCloudinary,
+    deleteImageFromCloudinary,
+} from "../services/storage.service.js";
+
+function removeLocalUpload(filePath) {
+    if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+    }
+}
 
 const analyzeSession = async (req, res) => {
+    const file = req.file;
+    const localPath = file?.path;
+
     try {
-        const file = req.file;
         const { question } = req.body;
         const userId = req.user.userId;
 
@@ -25,11 +38,13 @@ const analyzeSession = async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const analyzeReport = await analyzeStance(file.path, question, athlete);
+        const analyzeReport = await analyzeStance(localPath, question, athlete);
+
+        const uploadedImage = await uploadImageToCloudinary(localPath);
 
         const sessionStoring = await prisma.session.create({
             data: {
-                imageUrl: file.path,
+                imageUrl: uploadedImage.secure_url,
                 userId,
                 overallScore: analyzeReport.overallScore,
                 strengths: analyzeReport.strengths,
@@ -50,9 +65,14 @@ const analyzeSession = async (req, res) => {
         });
     } catch (err) {
         console.error("analyzeSession error:", err);
-        return res.status(500).json({
+        const isCloudinary =
+            err.message?.includes("Cloudinary") ||
+            err?.cause?.http_code === 403;
+        return res.status(isCloudinary ? 502 : 500).json({
             error: err.message || "Failed to analyze session",
         });
+    } finally {
+        removeLocalUpload(localPath);
     }
 };
 
@@ -100,9 +120,12 @@ const getSession = async (req, res) => {
 
 const sessionFollowUp = async (req, res) => {
     try {
-        const { message } = req.body;
+        const message = req.body?.message;
         if (!message?.trim()) {
-            return res.status(400).json({ message: "message is required" });
+            return res.status(400).json({
+                message:
+                    "message is required in JSON body. Send Content-Type: application/json with { \"message\": \"your question\" }",
+            });
         }
 
         const session = await prisma.session.findFirst({
@@ -170,5 +193,38 @@ const sessionFollowUp = async (req, res) => {
     }
 };
 
-export { analyzeSession, listSessions, getSession, sessionFollowUp };
-export default analyzeSession;
+const deleteSession = async (req, res) => {
+    try {
+        const session = await prisma.session.findFirst({
+            where: {
+                id: req.params.id,
+                userId: req.user.userId,
+            },
+        });
+
+        if (!session) {
+            return res.status(404).json({ message: "Session not found" });
+        }
+
+        await deleteImageFromCloudinary(session.imageUrl);
+
+        await prisma.session.delete({
+            where: { id: session.id },
+        });
+
+        return res.json({ message: "Session deleted successfully" });
+    } catch (err) {
+        console.error("deleteSession error:", err);
+        return res.status(500).json({
+            error: err.message || "Failed to delete session",
+        });
+    }
+};
+
+export {
+    analyzeSession,
+    listSessions,
+    getSession,
+    sessionFollowUp,
+    deleteSession,
+};

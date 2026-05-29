@@ -30,3 +30,20 @@ OR
 role-based authorization
 
 Those impress backend reviewers more than forgot password flows in assignments.
+
+
+
+
+
+
+
+
+
+
+see in this project i have done the authentication part so dont go there and i have touched some things in the ai architecture desing too what i need now is this
+
+things i have completed till now Backend Assignment Progress Summary
+
+Completed the core backend architecture for the AI-powered sports coaching platform using Express.js, Prisma ORM, and PostgreSQL. Designed relational database models for users, coaching sessions, and chat history with proper enums, relationships, timestamps, and JSON fields. Implemented a complete JWT-based authentication system including user registration, login, password hashing with bcrypt, secure cookie handling, and protected route middleware. Built a file upload pipeline using Multer to handle multipart/form-data image uploads and store uploaded stance images locally. Developed a protected AI session analysis workflow where authenticated users can upload stance images, send coaching-related questions, process AI analysis through a dedicated service layer, and persist structured coaching reports into the database. The system currently stores image paths, AI-generated scores, strengths, improvement areas, drill suggestions, confidence levels, and raw AI responses linked to each user session. Also established clean backend architecture practices by separating controllers, middleware, services, and database logic for scalability and maintainability.
+
+have completed these and the next step is making an ai part work 

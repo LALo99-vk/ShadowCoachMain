@@ -9,7 +9,6 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const XAI_API_KEY = process.env.XAI_API_KEY || process.env.GROK_API_KEY;
 const GROK_MODEL = process.env.GROK_MODEL || "grok-2-vision-1212";
 
-// 1.5 models return 404 on current API — use 2.5 / 2.0 only
 const DEFAULT_GEMINI_FALLBACKS = [
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
@@ -87,6 +86,10 @@ function getGenAI() {
     return new GoogleGenerativeAI(GEMINI_API_KEY);
 }
 
+function isRemoteImage(source) {
+    return /^https?:\/\//i.test(source);
+}
+
 function mimeTypeFromPath(filePath) {
     const ext = path.extname(filePath).toLowerCase();
     const map = {
@@ -106,6 +109,18 @@ function readImageBase64(filePath) {
     return fs.readFileSync(filePath).toString("base64");
 }
 
+async function fetchRemoteImage(imageUrl) {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch image from URL (${response.status})`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const mimeType =
+        response.headers.get("content-type")?.split(";")[0]?.trim() ||
+        mimeTypeFromPath(new URL(imageUrl).pathname);
+    return { buffer, mimeType };
+}
+
 function fileToGenerativePart(filePath) {
     return {
         inlineData: {
@@ -115,9 +130,25 @@ function fileToGenerativePart(filePath) {
     };
 }
 
-function imageDataUrl(filePath) {
-    const mime = mimeTypeFromPath(filePath);
-    return `data:${mime};base64,${readImageBase64(filePath)}`;
+async function imageToGenerativePart(imageSource) {
+    if (isRemoteImage(imageSource)) {
+        const { buffer, mimeType } = await fetchRemoteImage(imageSource);
+        return {
+            inlineData: {
+                data: buffer.toString("base64"),
+                mimeType,
+            },
+        };
+    }
+    return fileToGenerativePart(imageSource);
+}
+
+async function imageUrlForGrok(imageSource) {
+    if (isRemoteImage(imageSource)) {
+        return imageSource;
+    }
+    const mime = mimeTypeFromPath(imageSource);
+    return `data:${mime};base64,${readImageBase64(imageSource)}`;
 }
 
 function buildCoachSystemInstruction(athleteProfile = {}) {
@@ -253,7 +284,10 @@ async function grokChat({ systemInstruction, userText, imagePath, jsonMode }) {
     if (imagePath) {
         userContent.push({
             type: "image_url",
-            image_url: { url: imageDataUrl(imagePath), detail: "high" },
+            image_url: {
+                url: await imageUrlForGrok(imagePath),
+                detail: "high",
+            },
         });
     }
 
@@ -300,7 +334,7 @@ async function generateCoachingText({
     jsonMode,
 }) {
     const parts = imagePath
-        ? [{ text: userText }, fileToGenerativePart(imagePath)]
+        ? [{ text: userText }, await imageToGenerativePart(imagePath)]
         : [{ text: userText }];
 
     if (AI_PROVIDER === "grok") {
