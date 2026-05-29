@@ -2,16 +2,10 @@
   "name": "shadowcoach",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "frontend",
-    "server"
-  ],
   "scripts": {
-    "dev:server": "npm run start -w server",
-    "dev:frontend": "npm run dev -w frontend",
-    "build": "npm run build -w frontend",
-    "vercel-build": "npm run prisma:generate -w server && VERCEL=1 npm run build -w frontend && node scripts/prepare-vercel.mjs",
-    "vercel-build:ci": "cd server && npx prisma generate && cd ../frontend && VERCEL=1 npm run build && cd .. && node scripts/prepare-vercel.mjs"
+    "dev:server": "cd server && npm start",
+    "dev:frontend": "cd frontend && npm run dev",
+    "vercel-build:ci": "bash scripts/vercel-build.sh"
   },
   "dependencies": {
     "esbuild": "^0.25.12"

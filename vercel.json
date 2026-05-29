@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --prefix server && npm install --prefix frontend --include=dev --include=optional && npm install esbuild@^0.25.0 --prefix . --omit=dev",
-  "buildCommand": "npm run vercel-build:ci"
+  "installCommand": "bash scripts/vercel-install.sh",
+  "buildCommand": "bash scripts/vercel-build.sh"
 }
