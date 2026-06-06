@@ -46,6 +46,7 @@ function AnalyzePage() {
 
       setTimeout(() => setResult(response.session), 400);
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
       toast.success("Analysis complete.");
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Analysis failed"));

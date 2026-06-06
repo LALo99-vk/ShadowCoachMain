@@ -1,6 +1,3 @@
-import fs from "fs";
-import os from "os";
-import path from "path";
 import prisma from "../config/db.js";
 import { buildReportPdfBuffer } from "./report-pdf.service.js";
 import {
@@ -25,33 +22,30 @@ export function attachReportUrls(sessions) {
     return sessions.map(withReport);
 }
 
+function isCloudinaryPdfUrl(pdfUrl) {
+    return pdfUrl?.includes("res.cloudinary.com");
+}
+
 export async function createAndStoreSessionReport(session, userId) {
     const pdfBuffer = buildReportPdfBuffer(session);
-    const tempPath = path.join(os.tmpdir(), `${session.id}-report.pdf`);
+    const uploaded = await uploadPdfToCloudinary(pdfBuffer, session.id);
 
-    try {
-        fs.writeFileSync(tempPath, pdfBuffer);
-        const uploaded = await uploadPdfToCloudinary(tempPath, session.id);
-
-        const report = await prisma.sessionReport.create({
-            data: {
-                pdfUrl: uploaded.secure_url,
-                userId,
-                sessionId: session.id,
-            },
-        });
-
-        return report;
-    } finally {
-        if (fs.existsSync(tempPath)) {
-            fs.unlinkSync(tempPath);
-        }
-    }
+    return prisma.sessionReport.create({
+        data: {
+            pdfUrl: uploaded.secure_url,
+            userId,
+            sessionId: session.id,
+        },
+    });
 }
 
 export async function ensureSessionReport(session, userId) {
-    if (session.report) {
+    if (session.report && isCloudinaryPdfUrl(session.report.pdfUrl)) {
         return session.report;
+    }
+
+    if (session.report) {
+        return refreshStoredReport(session, userId);
     }
 
     return createAndStoreSessionReport(session, userId);
@@ -71,32 +65,27 @@ export async function refreshStoredReport(session, userId) {
     });
 
     const pdfBuffer = buildReportPdfBuffer(session);
-    const tempPath = path.join(os.tmpdir(), `${session.id}-report.pdf`);
+    const uploaded = await uploadPdfToCloudinary(pdfBuffer, session.id);
 
-    try {
-        fs.writeFileSync(tempPath, pdfBuffer);
-        const uploaded = await uploadPdfToCloudinary(tempPath, session.id);
-
-        if (existing) {
-            if (existing.pdfUrl !== uploaded.secure_url) {
-                await deletePdfFromCloudinary(existing.pdfUrl);
-            }
-            return prisma.sessionReport.update({
-                where: { id: existing.id },
-                data: { pdfUrl: uploaded.secure_url },
-            });
+    if (existing) {
+        if (
+            isCloudinaryPdfUrl(existing.pdfUrl) &&
+            existing.pdfUrl !== uploaded.secure_url
+        ) {
+            await deletePdfFromCloudinary(existing.pdfUrl);
         }
 
-        return prisma.sessionReport.create({
-            data: {
-                pdfUrl: uploaded.secure_url,
-                userId,
-                sessionId: session.id,
-            },
+        return prisma.sessionReport.update({
+            where: { id: existing.id },
+            data: { pdfUrl: uploaded.secure_url },
         });
-    } finally {
-        if (fs.existsSync(tempPath)) {
-            fs.unlinkSync(tempPath);
-        }
     }
+
+    return prisma.sessionReport.create({
+        data: {
+            pdfUrl: uploaded.secure_url,
+            userId,
+            sessionId: session.id,
+        },
+    });
 }

@@ -16,6 +16,46 @@ export function assertCloudinaryConfigured() {
     }
 }
 
+function cloudinaryPublicId(sessionId) {
+    return `shadowCoach/reports/shadow-report-${sessionId}`;
+}
+
+function assertCloudinaryPdfUrl(secureUrl) {
+    if (!secureUrl?.includes("res.cloudinary.com")) {
+        throw new Error("Cloudinary PDF upload did not return a valid secure URL");
+    }
+    return secureUrl;
+}
+
+function uploadRawPdf(source, sessionId) {
+    const uploadOptions = {
+        resource_type: "raw",
+        public_id: cloudinaryPublicId(sessionId),
+        overwrite: true,
+        invalidate: true,
+    };
+
+    if (Buffer.isBuffer(source)) {
+        return new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+                uploadOptions,
+                (err, result) => {
+                    if (err) reject(err);
+                    else resolve(result);
+                }
+            );
+            stream.end(source);
+        });
+    }
+
+    const absolutePath = path.resolve(source);
+    if (!fs.existsSync(absolutePath)) {
+        throw new Error(`PDF file not found for upload: ${absolutePath}`);
+    }
+
+    return cloudinary.uploader.upload(absolutePath, uploadOptions);
+}
+
 export async function uploadImageToCloudinary(localPath) {
     assertCloudinaryConfigured();
 
@@ -46,11 +86,11 @@ export async function uploadImageToCloudinary(localPath) {
     }
 }
 
-function publicIdFromCloudinaryUrl(imageUrl) {
-    if (!imageUrl?.includes("cloudinary.com")) {
+function publicIdFromCloudinaryUrl(fileUrl) {
+    if (!fileUrl?.includes("cloudinary.com")) {
         return null;
     }
-    const afterUpload = imageUrl.split("/upload/")[1];
+    const afterUpload = fileUrl.split("/upload/")[1];
     if (!afterUpload) {
         return null;
     }
@@ -71,22 +111,17 @@ export async function deleteImageFromCloudinary(imageUrl) {
     }
 }
 
-export async function uploadPdfToCloudinary(localPath, sessionId) {
+export async function uploadPdfToCloudinary(source, sessionId) {
     assertCloudinaryConfigured();
 
-    const absolutePath = path.resolve(localPath);
-    if (!fs.existsSync(absolutePath)) {
-        throw new Error(`PDF file not found for upload: ${absolutePath}`);
-    }
-
     try {
-        const result = await cloudinary.uploader.upload(absolutePath, {
-            folder: "shadowCoach/reports",
-            resource_type: "raw",
-            public_id: `shadow-report-${sessionId}.pdf`,
-            overwrite: true,
-        });
-        return result;
+        const result = await uploadRawPdf(source, sessionId);
+        const secureUrl = assertCloudinaryPdfUrl(result?.secure_url);
+
+        return {
+            ...result,
+            secure_url: secureUrl,
+        };
     } catch (err) {
         const cloudinaryMessage =
             err?.error?.message || err?.message || "Unknown Cloudinary error";
@@ -99,6 +134,10 @@ export async function uploadPdfToCloudinary(localPath, sessionId) {
 }
 
 export async function deletePdfFromCloudinary(pdfUrl) {
+    if (!pdfUrl?.includes("cloudinary.com")) {
+        return;
+    }
+
     const publicId = publicIdFromCloudinaryUrl(pdfUrl);
     if (!publicId) {
         return;

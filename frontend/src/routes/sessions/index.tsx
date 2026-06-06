@@ -60,40 +60,31 @@ function SessionsPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05, duration: 0.5 }}
             >
-              <div className="flex items-stretch border border-white/10 hover:border-white/30 transition-colors">
-                <Link
-                  to="/sessions/$sessionId"
-                  params={{ sessionId: s.id }}
-                  className="flex-1 min-w-0 p-4 md:p-6"
-                >
-                  <div className="flex gap-6 items-center">
-                    <img
-                      src={s.imageUrl}
-                      alt="Stance"
-                      className="w-20 h-20 object-cover border border-white/10"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-3">
-                        <span className="text-3xl font-bold text-white">{s.overallScore}</span>
-                        <span className="text-[10px] uppercase tracking-command text-smoke">
-                          / 100 · {s.confidenceLevel}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-white truncate">{s.priorityFix}</p>
-                      <p className="mt-1 text-[10px] uppercase tracking-command text-smoke">
-                        {new Date(s.createdAt).toLocaleString()}
-                      </p>
+              <Link
+                to="/sessions/$sessionId"
+                params={{ sessionId: s.id }}
+                className="block border border-white/10 hover:border-white/30 transition-colors p-4 md:p-6"
+              >
+                <div className="flex gap-6 items-center">
+                  <img
+                    src={s.imageUrl}
+                    alt="Stance"
+                    className="w-20 h-20 object-cover border border-white/10"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-3xl font-bold text-white">{s.overallScore}</span>
+                      <span className="text-[10px] uppercase tracking-command text-smoke">
+                        / 100 · {s.confidenceLevel}
+                      </span>
                     </div>
+                    <p className="mt-2 text-sm text-white truncate">{s.priorityFix}</p>
+                    <p className="mt-1 text-[10px] uppercase tracking-command text-smoke">
+                      {new Date(s.createdAt).toLocaleString()}
+                    </p>
                   </div>
-                </Link>
-                <Link
-                  to="/reports"
-                  search={{ session: s.id }}
-                  className="shrink-0 flex items-center px-4 md:px-6 text-[10px] uppercase tracking-command text-smoke hover:text-white border-l border-white/10 transition-colors"
-                >
-                  PDF →
-                </Link>
-              </div>
+                </div>
+              </Link>
             </motion.div>
           ))}
         </div>
