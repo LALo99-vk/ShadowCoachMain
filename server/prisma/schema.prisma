@@ -34,6 +34,7 @@ model User {
 
   sessions      Session[]
   refreshTokens RefreshToken[]
+  chatMessages  ChatMessage[]
 }
 
 model RefreshToken {
@@ -84,8 +85,13 @@ model ChatMessage {
 
   createdAt   DateTime @default(now())
 
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   sessionId   String
-  session     Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 

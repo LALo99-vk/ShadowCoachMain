@@ -15,6 +15,7 @@ export interface ChatMessage {
   role: "USER" | "ASSISTANT";
   message: string;
   createdAt: string;
+  userId: string;
 }
 
 export interface SessionDetail extends AnalysisData {

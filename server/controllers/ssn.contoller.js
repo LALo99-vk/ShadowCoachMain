@@ -134,7 +134,10 @@ const getSession = async (req, res) => {
                 userId: req.user.userId,
             },
             include: {
-                chats: { orderBy: { createdAt: "asc" } },
+                chats: {
+                    where: { userId: req.user.userId },
+                    orderBy: { createdAt: "asc" },
+                },
             },
         });
 
@@ -164,7 +167,10 @@ const sessionFollowUp = async (req, res) => {
                 userId: req.user.userId,
             },
             include: {
-                chats: { orderBy: { createdAt: "asc" } },
+                chats: {
+                    where: { userId: req.user.userId },
+                    orderBy: { createdAt: "asc" },
+                },
                 user: {
                     select: {
                         fullName: true,
@@ -185,6 +191,7 @@ const sessionFollowUp = async (req, res) => {
                 role: "USER",
                 message: message.trim(),
                 sessionId: session.id,
+                userId: req.user.userId,
             },
         });
 
@@ -208,6 +215,7 @@ const sessionFollowUp = async (req, res) => {
                 role: "ASSISTANT",
                 message: reply,
                 sessionId: session.id,
+                userId: req.user.userId,
             },
         });
 
