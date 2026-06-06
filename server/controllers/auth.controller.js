@@ -92,12 +92,13 @@ const registerFunction = async (req, res) => {
 };
 
 const loginFunction = async (req, res) => {
+    //i used safe parse because it wont throw error and server wont crash instead returns.  {success:false,error:{...}}
     const parsed = loginSchema.safeParse(req.body);
 
     if (!parsed.success) {
         return res.status(400).json({
             message: "incorrect format",
-            error: parsed.error.flatten(),
+            error: parsed.error.flatten(), // used to structure the error message
         });
     }
 
@@ -107,7 +108,7 @@ const loginFunction = async (req, res) => {
 
         const user = await prisma.user.findUnique({
             where: { email: emailNormalized },
-            select: { ...userProfileSelect, password: true },
+            select: { ...userProfileSelect, password: true }, 
         });
 
         if (!user) {
@@ -121,7 +122,7 @@ const loginFunction = async (req, res) => {
             return res.status(403).json({ message: "Invalid credentials" });
         }
 
-        const { password: _, ...profile } = user;
+        const { password: _, ...profile } = user;  // used object destrucuting here leaving out password 
         await issueTokenPair(profile, res, true);
 
         return res.status(200).json({
@@ -134,12 +135,14 @@ const loginFunction = async (req, res) => {
 };
 
 const logoutFunction = async (req, res) => {
+    
     await revokeRefreshToken(req.cookies[REFRESH_COOKIE_NAME]);
     res.clearCookie(AUTH_COOKIE_NAME, getAccessCookieOptions());
-    res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieOptions());
+    res.clearCookie(REFRESH_COOKIE_NAME, getRefreshCookieOptions()); //browser matches cooking using thir attributes so we call getaccess
     return res.status(200).json({ message: "Logout successful" });
 };
 
+// browser comes here when need access tokens after expiry
 const refreshTokenFunction = async (req, res) => {
     const refreshToken = req.cookies[REFRESH_COOKIE_NAME];
 

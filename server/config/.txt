@@ -47,3 +47,87 @@ things i have completed till now Backend Assignment Progress Summary
 Completed the core backend architecture for the AI-powered sports coaching platform using Express.js, Prisma ORM, and PostgreSQL. Designed relational database models for users, coaching sessions, and chat history with proper enums, relationships, timestamps, and JSON fields. Implemented a complete JWT-based authentication system including user registration, login, password hashing with bcrypt, secure cookie handling, and protected route middleware. Built a file upload pipeline using Multer to handle multipart/form-data image uploads and store uploaded stance images locally. Developed a protected AI session analysis workflow where authenticated users can upload stance images, send coaching-related questions, process AI analysis through a dedicated service layer, and persist structured coaching reports into the database. The system currently stores image paths, AI-generated scores, strengths, improvement areas, drill suggestions, confidence levels, and raw AI responses linked to each user session. Also established clean backend architecture practices by separating controllers, middleware, services, and database logic for scalability and maintainability.
 
 have completed these and the next step is making an ai part work 
+
+
+Cloudinary returns:
+
+{
+   secure_url:
+   "https://res.cloudinary.com/..."
+}
+
+
+
+
+
+
+Section 3: Image Processing
+
+Functions:
+
+readImageBase64()
+fetchRemoteImage()
+fileToGenerativePart()
+imageToGenerativePart()
+
+Purpose:
+
+Convert image into format AI understands.
+
+Gemini doesn't understand:
+
+/tmp/batting.jpg
+
+It understands:
+
+Base64 Image Data
+
+So these functions convert:
+
+Image File
+      ↓
+Base64
+      ↓
+Gemini Input
+
+Think:
+
+Translator
+
+between your server and AI.
+
+
+in  this function buildImageValidationInstruction
+Athlete profile gets injected.
+
+Beginner gets:
+
+Simple advice
+
+Advanced player gets:
+
+Technical advice
+
+This is personalization.
+
+
+
+line 553 in ai.service.js 
+
+SYSTEM:
+
+You are ShadowCoach...
+Sport = Cricket
+Role = Batsman
+
+-------------------
+
+USER:
+
+How is my batting stance?
+
+-------------------
+
+IMAGE:
+
+/tmp/batting.jpg

@@ -26,6 +26,58 @@ function geminiModelChain() {
     return [...new Set(fromEnv)];
 }
 
+export class ImageValidationError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "ImageValidationError";
+        this.statusCode = 400;
+    }
+}
+
+const imageValidationSchema = z.object({
+    isValidImage: z.boolean(),
+    isSportsRelated: z.boolean(),
+    hasAnalyzableStance: z.boolean(),
+    detectedContent: z.string().min(1),
+    rejectionReason: z.string().nullable(),
+});
+
+const IMAGE_VALIDATION_JSON_SCHEMA = {
+    type: SchemaType.OBJECT,
+    properties: {
+        isValidImage: {
+            type: SchemaType.BOOLEAN,
+            description: "True if this is a real, viewable photograph or image",
+        },
+        isSportsRelated: {
+            type: SchemaType.BOOLEAN,
+            description:
+                "True if the image shows sports, athletics, training, or athletic technique context",
+        },
+        hasAnalyzableStance: {
+            type: SchemaType.BOOLEAN,
+            description:
+                "True if a human body posture, stance, or athletic movement is visible enough to coach",
+        },
+        detectedContent: {
+            type: SchemaType.STRING,
+            description: "Brief description of what is in the image",
+        },
+        rejectionReason: {
+            type: SchemaType.STRING,
+            description:
+                "Why the image was rejected, or null if acceptable for coaching analysis",
+        },
+    },
+    required: [
+        "isValidImage",
+        "isSportsRelated",
+        "hasAnalyzableStance",
+        "detectedContent",
+        "rejectionReason",
+    ],
+};
+
 const coachingResponseSchema = z.object({
     overallScore: z.number().int().min(0).max(100),
     strengths: z.array(z.string()).min(1),
@@ -150,7 +202,7 @@ async function imageUrlForGrok(imageSource) {
     const mime = mimeTypeFromPath(imageSource);
     return `data:${mime};base64,${readImageBase64(imageSource)}`;
 }
-
+//athletes profile details get injected here for AI to get context of users
 function buildCoachSystemInstruction(athleteProfile = {}) {
     const { sport, level, role, fullName } = athleteProfile;
     const athleteLine = [
@@ -166,17 +218,109 @@ function buildCoachSystemInstruction(athleteProfile = {}) {
 
 Your job is to analyze sports stance, posture, and technique from a single photo and give honest, encouraging, actionable coaching.
 
+Strict scope:
+- Only analyze images that show a person in a sports stance, athletic posture, training movement, or competition context.
+- If the image is not sports-related (food, objects, landscapes, memes, pets, random scenes), do NOT invent coaching feedback.
+
 Guidelines:
 - Base feedback only on what is visible in the image. If the angle, lighting, or crop limits your view, lower confidenceLevel and say what you cannot assess.
 - Tailor language and drills to the athlete's sport and experience level when provided.
-- Be specific (body parts, angles, weight distribution, grip, foot placement) rather than generic praise.
+- Be specific (body parts, angles, weight distribution, grip, foot placement, knee bend, hip hinge, shoulder alignment) rather than generic praise.
+- Compare visible form against fundamentals for the detected sport/role when possible.
 - overallScore reflects visible technique for this snapshot, not the athlete's long-term potential.
-- strengths and areasToImprove must each contain at least two distinct bullet-style observations.
-- priorityFix is one clear, prioritized correction.
+- strengths and areasToImprove must each contain at least two distinct, image-specific observations (not generic platitudes).
+- priorityFix is one clear, prioritized correction tied to what you can see.
 - drillSuggestion is one practical drill they can do without special equipment when possible.
 - confidenceLevel must be exactly LOW, MEDIUM, or HIGH.
 
-${athleteLine ? `Athlete context: ${athleteLine}.` : "No athlete profile was provided; infer the sport from the image when possible."}`;
+${athleteLine ? `Athlete context: ${athleteLine}. Prioritize feedback for this sport and role.` : "No athlete profile was provided; infer the sport from the image when possible."}`;
+}
+
+function buildImageValidationInstruction(athleteProfile = {}) {
+    const sportHint = athleteProfile.sport
+        ? `The athlete's registered sport is ${athleteProfile.sport}. Prefer images that match or clearly relate to athletic training.`
+        : "No sport was provided on the profile.";
+
+    return `You are the upload gatekeeper for ShadowCoach, a sports stance analysis app.
+
+Decide whether this image is acceptable BEFORE any coaching analysis runs.
+
+ACCEPT only when ALL are true:
+- isValidImage: real photograph or clear sports image (not corrupt, blank, or unreadable)
+- isSportsRelated: shows sports, athletics, gym training, practice, or competition — not random everyday objects
+- hasAnalyzableStance: a human body posture, stance, swing, throw, jump, or athletic movement is visible enough to coach
+
+REJECT examples (set the matching flags to false):
+- Food, fruits, groceries, kitchen items
+- Landscapes, buildings, vehicles, furniture, screenshots, documents
+- Memes, cartoons, logos, text-only images
+- Pets or animals (unless clear equestrian sport with rider)
+- Sports equipment alone with no person and no stance to analyze
+- Crowd-only or jersey-only shots with no visible technique
+
+${sportHint}
+
+Respond with JSON only. If rejecting, write a helpful rejectionReason telling the user to upload a clear sports stance photo.`;
+}
+
+function parseImageValidationJson(rawText) {
+    let parsed;
+    try {
+        parsed = JSON.parse(rawText);
+    } catch {
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (!match) {
+            throw new ImageValidationError(
+                "Could not verify image content. Please upload a clear sports stance photo."
+            );
+        }
+        parsed = JSON.parse(match[0]);
+    }
+
+    const result = imageValidationSchema.safeParse(parsed);
+    if (!result.success) {
+        throw new ImageValidationError(
+            "Could not verify image content. Please upload a clear sports stance photo."
+        );
+    }
+    return result.data;
+}
+
+async function validateSportsImage(imagePath, athleteProfile = {}) {
+    const systemInstruction = buildImageValidationInstruction(athleteProfile);
+    const userText =
+        "Classify this upload for a sports coaching app. Is it a valid sports stance or athletic technique image suitable for analysis?";
+
+    const text = await generateCoachingText({
+        systemInstruction: `${systemInstruction}
+
+Respond with a single JSON object only (no markdown) with keys:
+isValidImage (boolean),
+isSportsRelated (boolean),
+hasAnalyzableStance (boolean),
+detectedContent (string),
+rejectionReason (string or null).`,
+        userText,
+        imagePath,
+        jsonMode: true,
+        responseSchema: IMAGE_VALIDATION_JSON_SCHEMA,
+        temperature: 0.1,
+    });
+
+    const validation = parseImageValidationJson(text);
+
+    if (
+        !validation.isValidImage ||
+        !validation.isSportsRelated ||
+        !validation.hasAnalyzableStance
+    ) {
+        const reason =
+            validation.rejectionReason?.trim() ||
+            `This image appears to show "${validation.detectedContent}", which is not a sports stance photo. Upload a clear photo of yourself in an athletic stance or movement.`;
+        throw new ImageValidationError(reason);
+    }
+
+    return validation;
 }
 
 function parseCoachingJson(rawText) {
@@ -213,15 +357,22 @@ function isGeminiRetryableError(err) {
     );
 }
 
-async function geminiGenerate({ modelName, systemInstruction, parts, jsonMode }) {
+async function geminiGenerate({
+    modelName,
+    systemInstruction,
+    parts,
+    jsonMode,
+    responseSchema,
+    temperature,
+}) {
     const genAI = getGenAI();
     const config = jsonMode
         ? {
-              temperature: 0.4,
+              temperature: temperature ?? 0.4,
               responseMimeType: "application/json",
-              responseSchema: COACHING_JSON_SCHEMA,
+              responseSchema: responseSchema ?? COACHING_JSON_SCHEMA,
           }
-        : { temperature: 0.6 };
+        : { temperature: temperature ?? 0.6 };
 
     const model = genAI.getGenerativeModel({
         model: modelName,
@@ -237,7 +388,14 @@ async function geminiGenerate({ modelName, systemInstruction, parts, jsonMode })
     return text;
 }
 
-async function geminiWithModelFallback({ systemInstruction, parts, jsonMode }) {
+async function geminiWithModelFallback({
+    systemInstruction,
+    parts,
+    jsonMode,
+    responseSchema,
+    temperature,
+    jsonOutputInstruction,
+}) {
     const models = geminiModelChain();
     let lastError;
 
@@ -246,10 +404,12 @@ async function geminiWithModelFallback({ systemInstruction, parts, jsonMode }) {
             const text = await geminiGenerate({
                 modelName,
                 systemInstruction: jsonMode
-                    ? `${systemInstruction}\n\n${JSON_OUTPUT_INSTRUCTION}`
+                    ? `${systemInstruction}\n\n${jsonOutputInstruction ?? JSON_OUTPUT_INSTRUCTION}`
                     : systemInstruction,
                 parts,
                 jsonMode,
+                responseSchema,
+                temperature,
             });
             if (modelName !== models[0]) {
                 console.warn(`Gemini succeeded with fallback model: ${modelName}`);
@@ -273,7 +433,13 @@ async function geminiWithModelFallback({ systemInstruction, parts, jsonMode }) {
     );
 }
 
-async function grokChat({ systemInstruction, userText, imagePath, jsonMode }) {
+async function grokChat({
+    systemInstruction,
+    userText,
+    imagePath,
+    jsonMode,
+    temperature,
+}) {
     if (!XAI_API_KEY) {
         throw new Error(
             "XAI_API_KEY (or GROK_API_KEY) is not configured. Get a key at https://console.x.ai"
@@ -297,7 +463,7 @@ async function grokChat({ systemInstruction, userText, imagePath, jsonMode }) {
             { role: "system", content: systemInstruction },
             { role: "user", content: userContent },
         ],
-        temperature: jsonMode ? 0.4 : 0.6,
+        temperature: temperature ?? (jsonMode ? 0.4 : 0.6),
     };
 
     if (jsonMode) {
@@ -332,6 +498,9 @@ async function generateCoachingText({
     userText,
     imagePath,
     jsonMode,
+    responseSchema,
+    temperature,
+    jsonOutputInstruction,
 }) {
     const parts = imagePath
         ? [{ text: userText }, await imageToGenerativePart(imagePath)]
@@ -340,39 +509,61 @@ async function generateCoachingText({
     if (AI_PROVIDER === "grok") {
         return grokChat({
             systemInstruction: jsonMode
-                ? `${systemInstruction}\n\n${JSON_OUTPUT_INSTRUCTION}`
+                ? `${systemInstruction}\n\n${jsonOutputInstruction ?? JSON_OUTPUT_INSTRUCTION}`
                 : systemInstruction,
             userText,
             imagePath,
             jsonMode,
+            temperature,
         });
     }
 
     if (AI_PROVIDER === "gemini") {
-        return geminiWithModelFallback({ systemInstruction, parts, jsonMode });
+        return geminiWithModelFallback({
+            systemInstruction,
+            parts,
+            jsonMode,
+            responseSchema,
+            temperature,
+            jsonOutputInstruction,
+        });
     }
 
     throw new Error(`Unknown AI_PROVIDER "${AI_PROVIDER}". Use "gemini" or "grok".`);
 }
 
 export async function analyzeStance(imagePath, question, athleteProfile = {}) {
+    await validateSportsImage(imagePath, athleteProfile);
+    
+    //this stores the long prompt with athleate detailsprefernsce and shadowcoach standard of teaching
     const systemInstruction = buildCoachSystemInstruction(athleteProfile);
 
+     //Image+ Question ai now has this 
     const userPrompt = question?.trim()
         ? `The athlete asks: "${question.trim()}"
 
-Analyze the uploaded stance/posture image and answer their question as part of your coaching feedback.`
-        : `Analyze the uploaded sports stance or posture image and provide a full coaching assessment.`;
+       
 
+Analyze the uploaded stance/posture image and answer their question as part of your coaching feedback.
+Focus only on visible sports technique. Give specific, image-grounded observations.`
+        : `Analyze the uploaded sports stance or posture image and provide a full coaching assessment.
+Focus only on visible sports technique. Give specific, image-grounded observations about body positioning and movement.`;
+
+
+    //..real AI call to gemini starts here
     const text = await generateCoachingText({
         systemInstruction,
         userText: userPrompt,
         imagePath,
         jsonMode: true,
     });
-
+    
+    //ai retrun string so we send it to convert to object has db expects obhjects
+    // and validates the ai output format too Zod catches it. 
     return parseCoachingJson(text);
 }
+
+//functions ends back to controller
 
 export async function sendSessionFollowUp({
     imagePath,

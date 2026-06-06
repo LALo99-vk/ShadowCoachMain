@@ -1,6 +1,6 @@
 import express from "express";
 import { authmiddleware } from "../middleware/auth.middleware.js";
-import upload from "../middleware/upload.middleware.js";
+import upload, { handleUploadError } from "../middleware/upload.middleware.js";
 import {
     analyzeSession,
     getSession,
@@ -15,8 +15,12 @@ const sessionRouter = express.Router();
 
 sessionRouter.use(express.json());
 
-sessionRouter.post( "/analyze",authmiddleware, sessionCreationLimiter,
+sessionRouter.post(
+    "/analyze",
+    authmiddleware,
+    sessionCreationLimiter,
     upload.single("image"),
+    handleUploadError,
     analyzeSession
 );
 

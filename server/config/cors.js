@@ -16,7 +16,7 @@ export function getAllowedOrigins() {
     const vercelOrigin = process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
         : null;
-
+    // remove duplicate urls 
     return [...new Set([...(fromEnv ?? []), ...(vercelOrigin ? [vercelOrigin] : []), ...defaultOrigins])];
 }
 

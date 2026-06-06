@@ -1,5 +1,6 @@
-const isProduction = process.env.NODE_ENV === "production";
-const isSameOriginDeploy = Boolean(process.env.VERCEL || process.env.SAME_ORIGIN === "true");
+const isProduction = process.env.NODE_ENV === "production"; // i used to differ environment is production or in development because cookies differ in different env
+const isSameOriginDeploy = Boolean(process.env.VERCEL || process.env.SAME_ORIGIN === "true"); //used to find if both BE and FE come from same origin
+
 
 export const AUTH_COOKIE_NAME = "token";
 export const REFRESH_COOKIE_NAME = "refreshToken";
@@ -16,7 +17,7 @@ function baseCookieOptions(maxAge) {
             maxAge,
         };
     }
-
+    // production but not same origin
     if (isProduction) {
         return {
             httpOnly: true,
@@ -25,7 +26,7 @@ function baseCookieOptions(maxAge) {
             maxAge,
         };
     }
-
+    // cross origin if BE and FE come from diff origins 
     const crossOriginDev = Boolean(process.env.CLIENT_URL?.trim());
     if (crossOriginDev) {
         return {
@@ -35,7 +36,7 @@ function baseCookieOptions(maxAge) {
             maxAge,
         };
     }
-
+    //local host only
     return {
         httpOnly: true,
         secure: false,

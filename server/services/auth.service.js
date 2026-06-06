@@ -26,6 +26,7 @@ export const userProfileSelect = {
     updatedAt: true,
 };
 
+// hashing refresh token because if db is compromised they can use refresh token directly so we hash the tokens
 function hashToken(token) {
     return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -50,7 +51,7 @@ export async function issueTokenPair(user, res, setCookies) {
     const accessToken = signAccessToken(user);
     const refreshToken = crypto.randomBytes(48).toString("hex");
     const expiresAt = new Date(
-        Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000
+        Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000 //creates the expiry date from the date this gets called
     );
 
     await prisma.refreshToken.create({
@@ -72,7 +73,7 @@ export async function issueTokenPair(user, res, setCookies) {
 
     return { accessToken, refreshToken, expiresAt };
 }
-
+// after access expire browser calls this function without user knowing
 export async function refreshSession(refreshToken) {
     const tokenHash = hashToken(refreshToken);
     const stored = await prisma.refreshToken.findUnique({
@@ -82,7 +83,7 @@ export async function refreshSession(refreshToken) {
         },
     });
 
-    if (!stored || stored.expiresAt < new Date()) {
+    if (!stored || stored.expiresAt < new Date()) { // we dont need expired token so delete
         if (stored) {
             await prisma.refreshToken.delete({ where: { id: stored.id } });
         }

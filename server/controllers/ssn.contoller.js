@@ -2,7 +2,11 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import prisma from "../config/db.js";
-import analyzeStance, { sendSessionFollowUp } from "../services/ai.service.js";
+import analyzeStance, {
+    ImageValidationError,
+    sendSessionFollowUp,
+} from "../services/ai.service.js";
+import { validateImageBuffer, extensionForMime } from "../middleware/upload.middleware.js";
 import {
     uploadImageToCloudinary,
     deleteImageFromCloudinary,
@@ -14,9 +18,12 @@ function removeLocalUpload(filePath) {
     }
 }
 
-function writeUploadToTemp(file) {
-    const ext = path.extname(file.originalname) || ".jpg";
-    const localPath = path.join(os.tmpdir(), `${Date.now()}-${file.originalname || `upload${ext}`}`);
+function writeUploadToTemp(file, detectedMime) {
+    const ext = extensionForMime(detectedMime) || path.extname(file.originalname) || ".jpg";
+    const localPath = path.join(
+        os.tmpdir(),
+        `${Date.now()}-upload${ext}`
+    );
     fs.writeFileSync(localPath, file.buffer);
     return localPath;
 }
@@ -32,8 +39,13 @@ const analyzeSession = async (req, res) => {
         if (!file?.buffer) {
             return res.status(400).json({ message: "Image is required" });
         }
+        //Real image Valid format allowed size
+        const fileCheck = validateImageBuffer(file.buffer);
+        if (!fileCheck.ok) {
+            return res.status(400).json({ message: fileCheck.message });
+        }
 
-        localPath = writeUploadToTemp(file);
+        localPath = writeUploadToTemp(file, fileCheck.detectedType);
 
         const athlete = await prisma.user.findUnique({
             where: { id: userId },
@@ -48,9 +60,10 @@ const analyzeSession = async (req, res) => {
         if (!athlete) {
             return res.status(404).json({ message: "User not found" });
         }
-
+       // xontroller hands all the info of user and image to ai AI IS CALLED HERE
         const analyzeReport = await analyzeStance(localPath, question, athlete);
-
+       
+        // i send the img in local path to be stored in cloudinary for permanant storage and Temporary file will be deleted later.
         const uploadedImage = await uploadImageToCloudinary(localPath);
 
         const sessionStoring = await prisma.session.create({
@@ -76,12 +89,18 @@ const analyzeSession = async (req, res) => {
         });
     } catch (err) {
         console.error("analyzeSession error:", err);
+
+        if (err instanceof ImageValidationError) {
+            return res.status(400).json({ message: err.message });
+        }
+
         const isCloudinary =
             err.message?.includes("Cloudinary") ||
             err?.cause?.http_code === 403;
         return res.status(isCloudinary ? 502 : 500).json({
             error: err.message || "Failed to analyze session",
         });
+        //used finally here because the local image should delete no matter success or failure
     } finally {
         removeLocalUpload(localPath);
     }
