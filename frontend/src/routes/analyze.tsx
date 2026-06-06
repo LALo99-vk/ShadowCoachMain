@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { UploadBox } from "@/components/shadow/UploadBox";
 import { ShadowOverlay } from "@/components/shadow/ShadowOverlay";
 import { AnalysisCard, type AnalysisData } from "@/components/shadow/AnalysisCard";
+import { ReportPdfActions } from "@/components/shadow/ReportPdfActions";
 import { sessionApi } from "@/lib/api/session";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { requireAuth } from "@/lib/require-auth";
@@ -24,7 +25,13 @@ function AnalyzePage() {
   const [file, setFile] = useState<File | null>(null);
   const [question, setQuestion] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<(AnalysisData & { id?: string }) | null>(null);
+  const [result, setResult] = useState<
+    (AnalysisData & {
+      id?: string;
+      createdAt?: string;
+      reportPdfUrl?: string | null;
+    }) | null
+  >(null);
 
   const onAnalyze = async () => {
     if (!file || analyzing) return;
@@ -117,6 +124,12 @@ function AnalyzePage() {
                     className="space-y-8"
                   >
                     <AnalysisCard data={result} />
+                    <ReportPdfActions
+                      data={result}
+                      sessionId={result.id}
+                      createdAt={result.createdAt}
+                      reportPdfUrl={result.reportPdfUrl}
+                    />
                     {result.id && (
                       <button
                         type="button"

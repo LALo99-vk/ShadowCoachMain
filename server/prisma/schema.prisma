@@ -35,6 +35,7 @@ model User {
   sessions      Session[]
   refreshTokens RefreshToken[]
   chatMessages  ChatMessage[]
+  reports       SessionReport[]
 }
 
 model RefreshToken {
@@ -73,6 +74,21 @@ model Session {
   user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   chats             ChatMessage[]
+  report            SessionReport?
+}
+
+model SessionReport {
+  id        String   @id @default(cuid())
+  pdfUrl    String
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sessionId String   @unique
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 

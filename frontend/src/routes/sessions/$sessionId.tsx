@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ChatBubble } from "@/components/shadow/ChatBubble";
 import { AnalysisCard } from "@/components/shadow/AnalysisCard";
+import { ReportPdfActions } from "@/components/shadow/ReportPdfActions";
 import { sessionApi } from "@/lib/api/session";
 import { getApiErrorMessage } from "@/lib/api/errors";
 import { requireAuth } from "@/lib/require-auth";
@@ -105,8 +106,14 @@ function SessionDetailPage() {
               alt="Stance"
               className="w-full max-h-80 object-contain border border-white/10 bg-[#111]"
             />
-            <div className="mt-8">
+            <div className="mt-8 space-y-6">
               <AnalysisCard data={session} />
+              <ReportPdfActions
+                data={session}
+                sessionId={session.id}
+                createdAt={session.createdAt}
+                reportPdfUrl={session.reportPdfUrl}
+              />
             </div>
           </div>
 

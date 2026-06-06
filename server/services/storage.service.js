@@ -70,3 +70,43 @@ export async function deleteImageFromCloudinary(imageUrl) {
         console.warn("Cloudinary delete failed:", err?.message || err);
     }
 }
+
+export async function uploadPdfToCloudinary(localPath, sessionId) {
+    assertCloudinaryConfigured();
+
+    const absolutePath = path.resolve(localPath);
+    if (!fs.existsSync(absolutePath)) {
+        throw new Error(`PDF file not found for upload: ${absolutePath}`);
+    }
+
+    try {
+        const result = await cloudinary.uploader.upload(absolutePath, {
+            folder: "shadowCoach/reports",
+            resource_type: "raw",
+            public_id: `shadow-report-${sessionId}.pdf`,
+            overwrite: true,
+        });
+        return result;
+    } catch (err) {
+        const cloudinaryMessage =
+            err?.error?.message || err?.message || "Unknown Cloudinary error";
+        const code = err?.http_code || err?.error?.http_code;
+
+        throw new Error(
+            `Cloudinary PDF upload failed${code ? ` (${code})` : ""}: ${cloudinaryMessage}`
+        );
+    }
+}
+
+export async function deletePdfFromCloudinary(pdfUrl) {
+    const publicId = publicIdFromCloudinaryUrl(pdfUrl);
+    if (!publicId) {
+        return;
+    }
+
+    try {
+        await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
+    } catch (err) {
+        console.warn("Cloudinary PDF delete failed:", err?.message || err);
+    }
+}

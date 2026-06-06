@@ -14,6 +14,7 @@ export function Navbar() {
       ? [
           { to: "/analyze", label: "Analyze" },
           { to: "/sessions", label: "History" },
+          { to: "/reports", label: "Reports" },
         ]
       : []),
   ] as const;

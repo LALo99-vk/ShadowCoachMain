@@ -4,9 +4,12 @@ import upload, { handleUploadError } from "../middleware/upload.middleware.js";
 import {
     analyzeSession,
     getSession,
+    getSessionReport,
+    listReports,
     listSessions,
     sessionFollowUp,
     deleteSession,
+    streamSessionReportFile,
 } from "../controllers/ssn.contoller.js";
 
 import { sessionCreationLimiter } from "../middleware/rateLimiter.js";
@@ -25,6 +28,12 @@ sessionRouter.post(
 );
 
 sessionRouter.get("/", authmiddleware, listSessions);
+
+sessionRouter.get("/reports", authmiddleware, listReports);
+
+sessionRouter.get("/:id/report/file", authmiddleware, streamSessionReportFile);
+
+sessionRouter.get("/:id/report", authmiddleware, getSessionReport);
 
 sessionRouter.get("/:id", authmiddleware, getSession);
 

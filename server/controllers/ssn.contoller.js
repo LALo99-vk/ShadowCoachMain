@@ -11,6 +11,15 @@ import {
     uploadImageToCloudinary,
     deleteImageFromCloudinary,
 } from "../services/storage.service.js";
+import {
+    attachReportUrl,
+    attachReportUrls,
+    createAndStoreSessionReport,
+    ensureSessionReport,
+    deleteSessionReport,
+    getReportPdfBuffer,
+    refreshStoredReport,
+} from "../services/session-report.service.js";
 
 function removeLocalUpload(filePath) {
     if (filePath && fs.existsSync(filePath)) {
@@ -83,9 +92,14 @@ const analyzeSession = async (req, res) => {
             },
         });
 
+        const report = await createAndStoreSessionReport(sessionStoring, userId);
+
         return res.status(201).json({
             message: "Session created successfully",
-            session: sessionStoring,
+            session: attachReportUrl({
+                ...sessionStoring,
+                report,
+            }),
         });
     } catch (err) {
         console.error("analyzeSession error:", err);
@@ -103,6 +117,39 @@ const analyzeSession = async (req, res) => {
         //used finally here because the local image should delete no matter success or failure
     } finally {
         removeLocalUpload(localPath);
+    }
+};
+
+const listReports = async (req, res) => {
+    try {
+        const reports = await prisma.sessionReport.findMany({
+            where: { userId: req.user.userId },
+            orderBy: { createdAt: "desc" },
+            include: {
+                session: {
+                    select: {
+                        id: true,
+                        imageUrl: true,
+                        overallScore: true,
+                        priorityFix: true,
+                        confidenceLevel: true,
+                        createdAt: true,
+                    },
+                },
+            },
+        });
+
+        return res.json({
+            reports: reports.map((report) => ({
+                id: report.id,
+                pdfUrl: report.pdfUrl,
+                createdAt: report.createdAt,
+                sessionId: report.sessionId,
+                session: report.session,
+            })),
+        });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 };
 
@@ -138,6 +185,9 @@ const getSession = async (req, res) => {
                     where: { userId: req.user.userId },
                     orderBy: { createdAt: "asc" },
                 },
+                report: {
+                    select: { pdfUrl: true },
+                },
             },
         });
 
@@ -145,7 +195,7 @@ const getSession = async (req, res) => {
             return res.status(404).json({ message: "Session not found" });
         }
 
-        return res.json({ session });
+        return res.json({ session: attachReportUrl(session) });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -231,7 +281,37 @@ const sessionFollowUp = async (req, res) => {
     }
 };
 
-const deleteSession = async (req, res) => {
+const getSessionReport = async (req, res) => {
+    try {
+        const session = await prisma.session.findFirst({
+            where: {
+                id: req.params.id,
+                userId: req.user.userId,
+            },
+            include: {
+                report: true,
+            },
+        });
+
+        if (!session) {
+            return res.status(404).json({ message: "Session not found" });
+        }
+
+        const report = await ensureSessionReport(session, req.user.userId);
+
+        return res.json({
+            pdfUrl: report.pdfUrl,
+            sessionId: session.id,
+        });
+    } catch (err) {
+        console.error("getSessionReport error:", err);
+        return res.status(500).json({
+            error: err.message || "Failed to get session report",
+        });
+    }
+};
+
+const streamSessionReportFile = async (req, res) => {
     try {
         const session = await prisma.session.findFirst({
             where: {
@@ -244,7 +324,50 @@ const deleteSession = async (req, res) => {
             return res.status(404).json({ message: "Session not found" });
         }
 
+        const buffer = getReportPdfBuffer(session);
+        const filename = `shadow-report-${session.id}.pdf`;
+        const download = req.query.download === "1";
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+            "Content-Disposition",
+            `${download ? "attachment" : "inline"}; filename="${filename}"`
+        );
+        res.setHeader("Content-Length", buffer.length);
+        res.send(buffer);
+
+        void refreshStoredReport(session, req.user.userId).catch((err) => {
+            console.warn("refreshStoredReport failed:", err?.message || err);
+        });
+    } catch (err) {
+        console.error("streamSessionReportFile error:", err);
+        return res.status(500).json({
+            error: err.message || "Failed to stream report",
+        });
+    }
+};
+
+const deleteSession = async (req, res) => {
+    try {
+        const session = await prisma.session.findFirst({
+            where: {
+                id: req.params.id,
+                userId: req.user.userId,
+            },
+            include: {
+                report: true,
+            },
+        });
+
+        if (!session) {
+            return res.status(404).json({ message: "Session not found" });
+        }
+
         await deleteImageFromCloudinary(session.imageUrl);
+
+        if (session.report?.pdfUrl) {
+            await deleteSessionReport(session.report.pdfUrl);
+        }
 
         await prisma.session.delete({
             where: { id: session.id },
@@ -262,7 +385,10 @@ const deleteSession = async (req, res) => {
 export {
     analyzeSession,
     listSessions,
+    listReports,
     getSession,
+    getSessionReport,
+    streamSessionReportFile,
     sessionFollowUp,
     deleteSession,
 };

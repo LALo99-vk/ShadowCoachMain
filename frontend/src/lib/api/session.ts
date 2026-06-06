@@ -10,6 +10,14 @@ export interface SessionSummary {
   createdAt: string;
 }
 
+export interface ReportSummary {
+  id: string;
+  pdfUrl: string;
+  createdAt: string;
+  sessionId: string;
+  session: SessionSummary;
+}
+
 export interface ChatMessage {
   id: string;
   role: "USER" | "ASSISTANT";
@@ -23,6 +31,7 @@ export interface SessionDetail extends AnalysisData {
   imageUrl: string;
   createdAt: string;
   userId: string;
+  reportPdfUrl: string | null;
   chats: ChatMessage[];
 }
 
@@ -45,6 +54,11 @@ export const sessionApi = {
     return res.data.sessions;
   },
 
+  listReports: async () => {
+    const res = await api.get<{ reports: ReportSummary[] }>("/session/reports");
+    return res.data.reports;
+  },
+
   get: async (id: string) => {
     const res = await api.get<{ session: SessionDetail }>(`/session/${id}`);
     return res.data.session;
@@ -60,6 +74,21 @@ export const sessionApi = {
 
   delete: async (id: string) => {
     const res = await api.delete<{ message: string }>(`/session/${id}`);
+    return res.data;
+  },
+
+  getReport: async (id: string) => {
+    const res = await api.get<{ pdfUrl: string; sessionId: string }>(
+      `/session/${id}/report`,
+    );
+    return res.data;
+  },
+
+  fetchReportFile: async (sessionId: string, download = false) => {
+    const res = await api.get<Blob>(`/session/${sessionId}/report/file`, {
+      params: download ? { download: "1" } : undefined,
+      responseType: "blob",
+    });
     return res.data;
   },
 };
