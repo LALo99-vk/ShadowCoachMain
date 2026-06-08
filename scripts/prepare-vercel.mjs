@@ -7,20 +7,59 @@ const nitroOut = path.join(root, "frontend/.vercel/output");
 const out = path.join(root, ".vercel/output");
 const apiFunc = path.join(out, "functions/api.func");
 
-function copyDir(src, dest) {
+const SERVER_EXCLUDE = new Set([
+    "node_modules",
+    "uploads",
+    ".env",
+    ".git",
+]);
+
+const NODE_MODULES_PRUNE = [
+    "prisma",
+    "nodemon",
+    "@prisma/internals",
+];
+
+function copyDir(src, dest, { exclude = null } = {}) {
     if (!fs.existsSync(src)) {
         return;
     }
     fs.mkdirSync(dest, { recursive: true });
     for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        if (exclude?.has(entry.name)) {
+            continue;
+        }
         const from = path.join(src, entry.name);
         const to = path.join(dest, entry.name);
         if (entry.isDirectory()) {
-            copyDir(from, to);
+            copyDir(from, to, { exclude });
         } else {
             fs.copyFileSync(from, to);
         }
     }
+}
+
+function rmDir(dir) {
+    if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
+function dirSizeBytes(dir) {
+    if (!fs.existsSync(dir)) {
+        return 0;
+    }
+    let total = 0;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        total += entry.isDirectory() ? dirSizeBytes(full) : fs.statSync(full).size;
+    }
+    return total;
+}
+
+function formatBytes(bytes) {
+    const mb = bytes / (1024 * 1024);
+    return `${mb.toFixed(1)} MB`;
 }
 
 async function main() {
@@ -33,8 +72,14 @@ async function main() {
 
     fs.mkdirSync(apiFunc, { recursive: true });
 
-    copyDir(path.join(root, "server"), path.join(apiFunc, "server"));
+    copyDir(path.join(root, "server"), path.join(apiFunc, "server"), {
+        exclude: SERVER_EXCLUDE,
+    });
     copyDir(path.join(root, "server/node_modules"), path.join(apiFunc, "node_modules"));
+
+    for (const pkg of NODE_MODULES_PRUNE) {
+        rmDir(path.join(apiFunc, "node_modules", pkg));
+    }
 
     fs.writeFileSync(
         path.join(apiFunc, "index.mjs"),
@@ -69,7 +114,13 @@ async function main() {
 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-    console.log("Prepared .vercel/output with Express API at /api");
+    const apiSize = dirSizeBytes(apiFunc);
+    console.log(`Prepared .vercel/output with Express API at /api (${formatBytes(apiSize)})`);
+    if (apiSize > 250 * 1024 * 1024) {
+        console.warn(
+            `WARNING: api.func is ${formatBytes(apiSize)} — exceeds Vercel's 250 MB unzipped limit`,
+        );
+    }
 }
 
 main().catch((err) => {

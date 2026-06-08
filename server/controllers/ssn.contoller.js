@@ -324,7 +324,7 @@ const streamSessionReportFile = async (req, res) => {
             return res.status(404).json({ message: "Session not found" });
         }
 
-        const buffer = getReportPdfBuffer(session);
+        const buffer = await getReportPdfBuffer(session);
         const filename = `shadow-report-${session.id}.pdf`;
         const download = req.query.download === "1";
 

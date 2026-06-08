@@ -27,7 +27,7 @@ function isCloudinaryPdfUrl(pdfUrl) {
 }
 
 export async function createAndStoreSessionReport(session, userId) {
-    const pdfBuffer = buildReportPdfBuffer(session);
+    const pdfBuffer = await buildReportPdfBuffer(session);
     const uploaded = await uploadPdfToCloudinary(pdfBuffer, session.id);
 
     return prisma.sessionReport.create({
@@ -64,7 +64,7 @@ export async function refreshStoredReport(session, userId) {
         where: { sessionId: session.id },
     });
 
-    const pdfBuffer = buildReportPdfBuffer(session);
+    const pdfBuffer = await buildReportPdfBuffer(session);
     const uploaded = await uploadPdfToCloudinary(pdfBuffer, session.id);
 
     if (existing) {
